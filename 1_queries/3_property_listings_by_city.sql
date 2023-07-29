@@ -45,3 +45,28 @@ FROM properties
 GROUP BY owner_id
 HAVING COUNT(*) > 4
 ORDER BY owner_id DESC;
+
+
+SELECT
+id,
+owner_id,
+title,
+description,
+cost_per_night,
+parking_spaces,
+number_of_bathrooms,
+number_of_bedrooms
+FROM
+properties
+WHERE
+title LIKE '%tomati%';
+
+
+GROUP BY
+properties.id
+HAVING
+avg(property_reviews.rating) >= 4
+ORDER BY
+properties.cost_per_night
+LIMIT
+10;
