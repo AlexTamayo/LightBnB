@@ -118,22 +118,29 @@ const addUser = function (user) {
 //   return getAllProperties(null, 2);
 // };
 const getAllReservations = function (guest_id, limit = 10) {
+
   const queryStr = `
   SELECT
-    properties.*
+    properties.*,
+    avg(property_reviews.rating) as average_rating
   FROM
     reservations
   JOIN
     properties ON properties.id = reservations.property_id
+  JOIN
+    property_reviews ON properties.id = property_reviews.property_id
   WHERE
     reservations.guest_id = $1
+  GROUP BY
+    properties.id,
+    reservations.start_date
   ORDER BY
     reservations.start_date
   LIMIT
   $2;
   `;
 
-  const values = [10, limit];
+  const values = [850, limit];
 
   // const values = [guest_id, limit];
 
@@ -143,8 +150,6 @@ const getAllReservations = function (guest_id, limit = 10) {
   .catch(err => console.log(err.message))
 
 };
-
-
 
 /// Properties
 
@@ -163,19 +168,80 @@ const getAllReservations = function (guest_id, limit = 10) {
 // };
 const getAllProperties = (options, limit = 10) => {
 
-  const queryStr = `
-  SELECT *
+  const queryParams = [];
+
+  let queryStr = `
+  SELECT
+    properties.*,
+    avg(property_reviews.rating) as average_rating
   FROM
     properties
-  LIMIT
-    $1;    
+  JOIN
+    property_reviews ON properties.id = property_id
   `;
 
-  const values = [limit];
+  const whereClauses = [];
+
+  //  owner_id | number_of_listings 
+  // ----------+--------------------
+  //     850   |         5
+  //     818   |         5
+  //     654   |         5
+  //     617   |         5
+  //     401   |         5
+
+  if (options.owner_id) {
+    // queryParams.push(`${options.owner_id}`);
+    queryParams.push(850);
+    whereClauses.push(`properties.owner_id = $${queryParams.length}`);
+  }
+
+  if (options.city) {
+    queryParams.push(`%${options.city}%`);
+    whereClauses.push(`city LIKE $${queryParams.length}`);
+  }
+
+  if (options.minimum_price_per_night) {
+    queryParams.push(`${options.minimum_price_per_night*100}`);
+    whereClauses.push(`cost_per_night >= $${queryParams.length}`);
+  }
+  
+  if (options.maximum_price_per_night) {
+    queryParams.push(`${options.maximum_price_per_night*100}`);
+    whereClauses.push(`cost_per_night <= $${queryParams.length}`);
+  }
+
+  if(whereClauses.length > 0) {
+    queryStr += ' WHERE ' + whereClauses.join(' AND ');
+  }
+
+  queryStr += `
+  GROUP BY
+    properties.id
+  `;
+
+  if (options.minimum_rating) {
+    queryParams.push(`${options.minimum_rating}`);
+    queryStr += `HAVING avg(property_reviews.rating) >= $${queryParams.length}`;
+
+  }
+
+  queryParams.push(`${limit}`);
+  queryStr += `
+  ORDER BY
+    cost_per_night
+  LIMIT
+    $${queryParams.length};
+  `;
+
+  // console.log(queryStr, queryParams);
 
   return pool
-    .query(queryStr, values)
-    .then(result => result.rows)
+    .query(queryStr, queryParams)
+    .then(result => {
+      // console.log(result);
+      // console.log(result.rows);
+      return result.rows})
     .catch(err => console.log(err.message));
 };
 
